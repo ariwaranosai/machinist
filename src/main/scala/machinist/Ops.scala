@@ -2,7 +2,7 @@ package machinist
 
 import scala.language.higherKinds
 
-import scala.reflect.macros.Context
+import scala.reflect.macros.blackbox.Context
 
 /**
  * This trait has some nice methods for working with implicit `Ops`
@@ -44,7 +44,7 @@ trait Ops {
   def unop[R](c: Context)(): c.Expr[R] = {
     import c.universe._
     val (ev, lhs) = unpack(c)
-    c.Expr[R](Apply(Select(ev, findMethodName(c)), List(lhs)))
+    c.Expr[R](q"$ev.${findMethodName(c)}($lhs)")
   }
 
   /**
@@ -55,7 +55,7 @@ trait Ops {
   def unop0[R](c: Context): c.Expr[R] = {
     import c.universe._
     val (ev, lhs) = unpack(c)
-    c.Expr[R](Apply(Select(ev, findMethodName(c)), List(lhs)))
+    c.Expr[R](q"$ev.${findMethodName(c)}($lhs)")
   }
 
   /**
@@ -85,7 +85,7 @@ trait Ops {
   def unopWithEv[Ev, R](c: Context)(ev: c.Expr[Ev]): c.Expr[R] = {
     import c.universe._
     val lhs = unpackWithoutEv(c)
-    c.Expr[R](Apply(Select(ev.tree, findMethodName(c)), List(lhs)))
+    c.Expr[R](q"${ev.tree}.${findMethodName(c)}($lhs)")
   }
 
   /**
@@ -115,7 +115,7 @@ trait Ops {
   def unopWithEv2[Ev1, R](c: Context)(ev1: c.Expr[Ev1]): c.Expr[R] = {
     import c.universe._
     val (ev, lhs) = unpack(c)
-    c.Expr[R](Apply(Apply(Select(ev, findMethodName(c)), List(lhs)), List(ev1.tree)))
+    c.Expr[R](q"$ev.${findMethodName(c)}($lhs)(${ev1.tree})")
   }
 
   /**
@@ -147,7 +147,7 @@ trait Ops {
   def binop[A, R](c: Context)(rhs: c.Expr[A]): c.Expr[R] = {
     import c.universe._
     val (ev, lhs) = unpack(c)
-    c.Expr[R](Apply(Select(ev, findMethodName(c)), List(lhs, rhs.tree)))
+    c.Expr[R](q"$ev.${findMethodName(c)}($lhs, ${rhs.tree})")
   }
 
   /**
@@ -176,7 +176,7 @@ trait Ops {
   def rbinop[A, R](c: Context)(lhs: c.Expr[A]): c.Expr[R] = {
     import c.universe._
     val (ev, rhs) = unpack(c)
-    c.Expr[R](Apply(Select(ev, findMethodName(c)), List(lhs.tree, rhs)))
+    c.Expr[R](q"$ev.${findMethodName(c)}(${lhs.tree}, $rhs)")
   }
 
   def unopWithScalar[R](c: Context)(): c.Expr[R] =
@@ -188,8 +188,8 @@ trait Ops {
   def handleUnopWithChild[R](c: Context)(childName: String): c.Expr[R] = {
     import c.universe._
     val (ev, lhs) = unpack(c)
-    val child = Select(ev, newTermName(childName))
-    c.Expr[R](Apply(Select(child, findMethodName(c)), List(lhs)))
+    val child = q"$ev.${TermName(childName)}"
+    c.Expr[R](q"$child.${findMethodName(c)}($lhs)")
   }
 
   /**
@@ -225,8 +225,8 @@ trait Ops {
   def handleBinopWithChild[A, R](c: Context)(rhs: c.Expr[A])(childName: String): c.Expr[R] = {
     import c.universe._
     val (ev, lhs) = unpack(c)
-    val child = Select(ev, newTermName(childName))
-    c.Expr[R](Apply(Select(child, findMethodName(c)), List(lhs, rhs.tree)))
+    val child = q"$ev.${TermName(childName)}"
+    c.Expr[R](q"$child.${findMethodName(c)}($lhs, ${rhs.tree})")
   }
 
   /**
@@ -256,7 +256,7 @@ trait Ops {
   def binopWithEv[A, Ev, R](c: Context)(rhs: c.Expr[A])(ev: c.Expr[Ev]): c.Expr[R] = {
     import c.universe._
     val lhs = unpackWithoutEv(c)
-    c.Expr[R](Apply(Select(ev.tree, findMethodName(c)), List(lhs, rhs.tree)))
+    c.Expr[R](q"${ev.tree}.${findMethodName(c)}($lhs, ${rhs.tree})")
   }
 
   /**
@@ -286,7 +286,7 @@ trait Ops {
   def rbinopWithEv[A, Ev, R](c: Context)(lhs: c.Expr[A])(ev: c.Expr[Ev]): c.Expr[R] = {
     import c.universe._
     val rhs = unpackWithoutEv(c)
-    c.Expr[R](Apply(Select(ev.tree, findMethodName(c)), List(lhs.tree, rhs)))
+    c.Expr[R](q"${ev.tree}.${findMethodName(c)}(${lhs.tree}, $rhs)")
   }
 
   /**
@@ -321,8 +321,8 @@ trait Ops {
     import c.universe._
     val (ev0, lhs) = unpack(c)
     val typeName = weakTypeOf[A].typeSymbol.name
-    val rhs1 = Apply(Select(ev1.tree, newTermName("from" + typeName)), List(rhs.tree))
-    c.Expr[R](Apply(Select(ev0, findMethodName(c)), List(lhs, rhs1)))
+    val rhs1 = Apply(Select(ev1.tree, TermName("from" + typeName)), List(rhs.tree))
+    c.Expr[R](q"$ev0.${findMethodName(c)}($lhs, $rhs1)")
   }
 
   /**
@@ -353,8 +353,8 @@ trait Ops {
     import c.universe._
     val (ev0, lhs) = unpack(c)
     val typeName = weakTypeOf[A].typeSymbol.name
-    val rhs1 = Apply(Select(ev0, newTermName("from" + typeName)), List(rhs.tree))
-    c.Expr[R](Apply(Select(ev0, findMethodName(c)), List(lhs, rhs1)))
+    val rhs1 = q"$ev0.${TermName("from" + typeName)}(${rhs.tree})"
+    c.Expr[R](q"$ev0.${findMethodName(c)}($lhs, $rhs1)")
   }
 
   /**
@@ -378,7 +378,7 @@ trait Ops {
   def flip[A, R](c: Context)(rhs: c.Expr[A]): c.Expr[R] = {
     import c.universe._
     val lhs = unpackWithoutEv(c)
-    c.Expr[R](Apply(Select(rhs.tree, findMethodName(c)), List(lhs)))
+    c.Expr[R](q"${rhs.tree}.${findMethodName(c)}($lhs)")
   }
 
   /**
@@ -444,7 +444,7 @@ trait Ops {
   def findMethodName(c: Context) = {
     import c.universe._
     val s = c.macroApplication.symbol.name.toString
-    newTermName(operatorNames.getOrElse(s, s))
+    TermName(operatorNames.getOrElse(s, s))
   }
 
   /**
